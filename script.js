@@ -1,5 +1,5 @@
 // ============================================================================
-// Monish’s Watchlist — Clean, Simple & Fast
+// Monish’s Watchlist — Clean, Simple & Fast (10/10 Cinephile Edition)
 // ============================================================================
 
 const CATEGORIES = [
@@ -231,7 +231,7 @@ const MIGRATION_KEY = 'monish-watchlist-to-watch-v2';
 let state = {
   items: [],
   view: 0,       // 0: To Watch, 1: Already Watched
-  tab: 'anime',  // Active category id
+  tab: 'all',    // Active category id ('all' or specific category)
   sort: 'o'      // Sort option
 };
 
@@ -281,7 +281,7 @@ function save() {
   } catch (e) {}
 }
 
-// Load state from localStorage with migration to keep watched and update to-watch
+// Load state with migration to update to-watch and preserve watched titles
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -291,6 +291,7 @@ function load() {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.items) && parsed.items.length) {
         state = parsed;
+        if (!state.tab) state.tab = 'all';
         itemCounter = state.items.length + 1000;
 
         // Auto-migrate: replace to-watch list with the new final ranked list while keeping already-watched
@@ -333,17 +334,23 @@ function esc(str) {
 
 function getCategoryColor(catId) {
   const cat = CATEGORIES.find(c => c.id === catId);
-  return cat ? cat.color : '#e0b33a';
+  return cat ? cat.color : '#818cf8';
 }
 
 function getCategoryName(catId) {
   const cat = CATEGORIES.find(c => c.id === catId);
-  return cat ? cat.name : 'Category';
+  return cat ? cat.name : 'All';
+}
+
+function clearSurprise() {
+  const banner = document.getElementById('surpriseBanner');
+  if (banner) banner.innerHTML = '';
 }
 
 // Switch between To Watch (0) and Already Watched (1)
 function setView(v) {
   state.view = v;
+  clearSurprise();
   save();
   render();
 }
@@ -351,6 +358,7 @@ function setView(v) {
 // Switch Category Tab
 function setTab(tabId) {
   state.tab = tabId;
+  clearSurprise();
   save();
   render();
 }
@@ -379,7 +387,8 @@ function addItem() {
   const val = input.value.trim();
   if (!val) return;
 
-  const item = makeItem(state.tab, val, state.view);
+  const targetCategory = state.tab === 'all' ? 'movies' : state.tab;
+  const item = makeItem(targetCategory, val, state.view);
   item.o = itemCounter + 10000;
   state.items.push(item);
   input.value = '';
@@ -389,14 +398,14 @@ function addItem() {
 
 // Surprise Me Picker
 function surprise() {
-  const pool = state.items.filter(i => i.c === state.tab && !i.d);
+  const pool = state.items.filter(i => (state.tab === 'all' || i.c === state.tab) && !i.d);
   const banner = document.getElementById('surpriseBanner');
   
   if (!pool.length) {
     banner.innerHTML = `
       <div class="surprise-box">
-        <span>🎉 You've watched everything in this category!</span>
-        <button class="btn" onclick="document.getElementById('surpriseBanner').innerHTML=''">Dismiss</button>
+        <span>🎉 You've watched everything here! Time to add more titles.</span>
+        <button class="btn" onclick="clearSurprise()">Dismiss</button>
       </div>
     `;
     return;
@@ -427,19 +436,32 @@ function toggleWatched(id) {
   item.d = item.d ? 0 : 1;
   if (!item.d) item.r = 0; // reset rating if moved back to To Watch
   
-  // Clear surprise banner if this was the picked item
-  document.getElementById('surpriseBanner').innerHTML = '';
+  clearSurprise();
   save();
   render();
 }
 
-// Set Rating (1 to 5 stars)
+// Interactive Star Ratings with Live Hover
 function setRating(id, rating) {
   const item = state.items.find(x => x.id === id);
   if (!item) return;
   item.r = item.r === rating ? 0 : rating;
   save();
   render();
+}
+
+function hoverStars(itemId, score) {
+  for (let s = 1; s <= 5; s++) {
+    const el = document.getElementById(`star_${itemId}_${s}`);
+    if (el) el.className = `star ${s <= score ? 'active' : ''}`;
+  }
+}
+
+function resetStars(itemId, currentRating) {
+  for (let s = 1; s <= 5; s++) {
+    const el = document.getElementById(`star_${itemId}_${s}`);
+    if (el) el.className = `star ${s <= currentRating ? 'active' : ''}`;
+  }
 }
 
 // Delete item
@@ -485,8 +507,25 @@ function render() {
     </div>
   `).join('');
 
-  // Category Tabs
-  document.getElementById('categoriesBar').innerHTML = CATEGORIES.map(cat => {
+  // Category Tabs (with "🌟 All" tab)
+  const allTotal = items.length;
+  const allWatched = watched.length;
+  const allPct = allTotal ? (allWatched / allTotal) * 100 : 0;
+  const isAllActive = state.tab === 'all' ? 'active' : '';
+
+  let catsHtml = `
+    <button class="cat-btn ${isAllActive}" style="--cat-color: #818cf8" onclick="setTab('all')">
+      <div class="cat-title-row">
+        <span>🌟 All</span>
+        <span class="cat-count">${allWatched}/${allTotal}</span>
+      </div>
+      <div class="cat-progress">
+        <div class="cat-progress-fill" style="width:${allPct}%;"></div>
+      </div>
+    </button>
+  `;
+
+  catsHtml += CATEGORIES.map(cat => {
     const catItems = items.filter(i => i.c === cat.id);
     const catWatched = catItems.filter(i => i.d).length;
     const catPct = catItems.length ? (catWatched / catItems.length) * 100 : 0;
@@ -505,12 +544,14 @@ function render() {
     `;
   }).join('');
 
+  document.getElementById('categoriesBar').innerHTML = catsHtml;
+
   // Segment Buttons
   document.getElementById('viewToWatch').className = state.view === 0 ? 'active' : '';
   document.getElementById('viewWatched').className = state.view === 1 ? 'active' : '';
 
   // Quick Add Placeholder
-  const currentCatName = getCategoryName(state.tab);
+  const currentCatName = state.tab === 'all' ? 'Watchlist' : getCategoryName(state.tab);
   document.getElementById('addInput').placeholder = 
     `Add to ${state.view ? 'Already Watched' : 'To Watch'} · ${currentCatName}…`;
 
@@ -521,7 +562,7 @@ function render() {
   const sortVal = document.getElementById('sortSelect').value;
   state.sort = sortVal;
 
-  let list = items.filter(i => i.c === state.tab && i.d === state.view);
+  let list = items.filter(i => (state.tab === 'all' || i.c === state.tab) && i.d === state.view);
   if (q) {
     list = list.filter(i => i.t.toLowerCase().includes(q) || (i.y && i.y.toLowerCase().includes(q)));
   }
@@ -550,32 +591,43 @@ function render() {
   listEl.innerHTML = list.map(item => {
     const initial = esc(item.t.replace(/^The\s+/i, '').charAt(0).toUpperCase());
     const catColor = getCategoryColor(item.c);
+    const catName = getCategoryName(item.c);
+    const trailerQuery = encodeURIComponent(item.t + ' ' + (item.y ? item.y.substring(0, 4) : '') + ' trailer');
 
-    // Stars HTML (if in Watched view)
+    // Interactive Stars HTML with hover effects (if in Watched view)
     let starsHtml = '';
     if (item.d) {
-      starsHtml = '<div class="stars">';
+      starsHtml = `<div class="stars" onmouseleave="resetStars('${item.id}', ${item.r})" title="${item.r ? item.r + ' / 5 stars' : 'Click to rate'}">`;
       for (let s = 1; s <= 5; s++) {
-        starsHtml += `<span onclick="setRating('${item.id}', ${s})">${s <= item.r ? '★' : '☆'}</span>`;
+        starsHtml += `<span class="star ${s <= item.r ? 'active' : ''}" 
+          id="star_${item.id}_${s}" 
+          onmouseenter="hoverStars('${item.id}', ${s})" 
+          onclick="setRating('${item.id}', ${s})">★</span>`;
       }
       starsHtml += '</div>';
     }
 
     return `
       <div class="card" style="--cat-color:${catColor};">
-        <div class="card-avatar">${initial}</div>
+        <div class="card-avatar" title="${catName}">${initial}</div>
         <div class="card-info">
-          <div class="card-title" title="${esc(item.t)}">${esc(item.t)}</div>
+          <a class="card-title" href="https://www.youtube.com/results?search_query=${trailerQuery}" target="_blank" rel="noopener" title="Watch trailer on YouTube">
+            ${esc(item.t)}
+          </a>
           <div class="card-meta">
             <span>${esc(item.y)}</span>
+            ${state.tab === 'all' ? ` · <span style="color:${catColor};font-weight:600;">${catName}</span>` : ''}
             ${item.k ? ` · <span class="rank-tag">Priority #${item.k}</span>` : ''}
+            <a class="trailer-pill" href="https://www.youtube.com/results?search_query=${trailerQuery}" target="_blank" rel="noopener" title="Watch trailer on YouTube">
+              ▶ Trailer
+            </a>
           </div>
         </div>
         <div class="card-actions">
           ${starsHtml}
           <div class="card-btns">
             <button class="card-btn" onclick="toggleWatched('${item.id}')">${item.d ? '↩' : '✓ Watched'}</button>
-            <button class="card-btn" onclick="deleteItem('${item.id}')" aria-label="Delete">✕</button>
+            <button class="card-btn card-btn-delete" onclick="deleteItem('${item.id}')" aria-label="Delete" title="Remove title">✕</button>
           </div>
         </div>
       </div>
