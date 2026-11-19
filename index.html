@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Monish’s Watchlist</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div>
+        <h1>Monish’s <span>Watchlist</span></h1>
+        <p class="subtitle" id="progressText">Loading…</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-primary" onclick="surprise()">🎲 Surprise me</button>
+        <button class="btn" onclick="openBackup()" title="Backup or restore watchlist">💾 Backup</button>
+        <button class="btn btn-icon" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      </div>
+    </header>
+
+    <!-- 4 Stats Counters -->
+    <section class="stats" id="statsGrid"></section>
+
+    <!-- Category Tabs with Progress Bars -->
+    <nav class="categories" id="categoriesBar"></nav>
+
+    <!-- Tools: Status, Search, Sort -->
+    <section class="tools">
+      <div class="segmented">
+        <button id="viewToWatch" class="active" onclick="setView(0)">To Watch</button>
+        <button id="viewWatched" onclick="setView(1)">Already Watched</button>
+      </div>
+
+      <div class="search-wrap">
+        <input type="search" id="searchInput" placeholder="Search titles or year…" oninput="render()">
+        <button class="clear-search" id="clearSearchBtn" onclick="clearSearch()" style="display:none;" aria-label="Clear">✕</button>
+      </div>
+
+      <select id="sortSelect" onchange="render()">
+        <option value="o">Curated order</option>
+        <option value="y-desc">Year (newest)</option>
+        <option value="y-asc">Year (oldest)</option>
+        <option value="t-asc">Title (A–Z)</option>
+        <option value="t-desc">Title (Z–A)</option>
+        <option value="r-desc">Rating (highest)</option>
+      </select>
+    </section>
+
+    <!-- Quick Add Input -->
+    <div class="add-bar">
+      <input id="addInput" placeholder="Add a title (e.g. Parasite (2019))…" onkeydown="if(event.key==='Enter')addItem()">
+      <button class="btn btn-primary" onclick="addItem()">Add</button>
+    </div>
+
+    <!-- Inline Surprise Me Banner -->
+    <div id="surpriseBanner"></div>
+
+    <!-- Watchlist Grid -->
+    <main class="grid" id="itemsList"></main>
+  </div>
+
+  <!-- Lightweight Backup Modal -->
+  <dialog id="backupDialog" class="dialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <h3>💾 Backup & Restore</h3>
+        <button class="dialog-close" onclick="closeBackup()">✕</button>
+      </div>
+      <p class="dialog-desc">Save your progress or restore from a JSON backup file.</p>
+      
+      <div class="dialog-actions">
+        <button class="btn btn-primary" onclick="exportData()">📥 Export JSON Backup</button>
+        <button class="btn" onclick="document.getElementById('fileInput').click()">📤 Import JSON Backup</button>
+        <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="importData(event)">
+      </div>
+
+      <div class="dialog-danger">
+        <button class="btn btn-danger" onclick="resetToDefaults()">Reset to Defaults (189 Titles)</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="script.js"></script>
+</body>
+</html>
